@@ -14,8 +14,45 @@ library(quantmod)
 # Define server logic required to draw a histogram
 shinyServer(function(input, output) {
     
+    getstockdata <- 
+        function()
+        {
+            start <- as.Date(input$dates[1])
+            end <- as.Date(input$dates[2])
+            ticker <- input$symbol
+            s <- getSymbols(ticker, src = "yahoo", auto.assign = F, from = start, to = end)
+            data <- s[,4]
+            sma <- SMA(Cl(data), n=50)
+            macd <- MACD(data, nFast=12, nSlow=26, nSig=50, maType=SMA, percent = FALSE)
+            signal <- Lag(ifelse(macd$macd < macd$signal, -1, 1))
+            data
+        }
+    
+    getstocksignal <- 
+        function()
+        {
+            start <- as.Date(input$dates[1])
+            end <- as.Date(input$dates[2])
+            ticker <- input$symbol
+            s <- getSymbols(ticker, src = "yahoo", auto.assign = F, from = start, to = end)
+            data <- s[,4]
+            sma <- SMA(Cl(data), n=50)
+            macd <- MACD(data, nFast=12, nSlow=26, nSig=50, maType=SMA, percent = FALSE)
+            signal <- Lag(ifelse(macd$macd < macd$signal, -1, 1))
+            signal
+        }    
+    
+    plot <- function()
+    {
+        data <- getstockdata()
+        chartSeries(data, name = "Strategy Chart Series", theme = chartTheme('white'),
+                    TA=c(addVo(), addBBands(), addMACD(signal=50)))         
+    }
+    
     optionInput <- reactive (
         {
+            signal <- getstocksignal()            
+            
             if (input$showEnd)
             {
                 a <- as.numeric(tail(signal,1))
@@ -30,17 +67,7 @@ shinyServer(function(input, output) {
 
     output$stockPlot <- 
             renderPlot({
-
-                start <- as.Date(input$dates[1])
-                end <- as.Date(input$dates[2])
-                ticker <- input$symbol
-                s <- getSymbols(ticker, src = "yahoo", auto.assign = F, from = start, to = end)
-                data <- s[,4]
-                sma <- SMA(Cl(data), n=50)
-                macd <- MACD(data, nFast=12, nSlow=26, nSig=50, maType=SMA, percent = FALSE)
-                signal <- Lag(ifelse(macd$macd < macd$signal, -1, 1))
-                chartSeries(data, name = "Strategy Chart Series", theme = chartTheme('white'),
-                            TA=c(addVo(), addBBands(), addMACD(signal=50)))
+                plot()
             })
     
     output$result <- 
